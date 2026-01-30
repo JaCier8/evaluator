@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(evaluator LANGUAGES C)
+project(evaluator LANGUAGES C CXX)
 
 # set(CMAKE_VERBOSE_MAKEFILE ON)
 

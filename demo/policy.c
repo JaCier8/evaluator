@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 char state[STATE_SIZE + 2];
 char action[ACTION_SIZE + 2];
@@ -24,6 +25,7 @@ int main(int argc, char *argv[])
     while (fgets(state, sizeof state, stdin) != NULL) {
         state[STATE_SIZE] = '\0';
         fprintf(stderr, "Policy got state: '%s'\n", state);
+
 
         if (fputs(action, stdout) < 0 || fflush(stdout) != 0) {
             perror("fputs");
