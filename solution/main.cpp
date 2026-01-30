@@ -33,7 +33,7 @@ char **extra_args;
 int max_concurrent_policy_calls;
 int max_concurrent_calls;
 int max_active_envs;
-sem_t *sem_env_limit;
+int fd_to_writer;
 
 struct Global {
     sem_t sem_env;
@@ -48,7 +48,7 @@ struct Global {
 struct Result {
     int test_num;
     char test_name[NAME_SIZE + 1];
-    char test_result[NAME_SIZE + 1];
+    char test_result[STATE_SIZE + 1];
 };
 
 struct Global* global = nullptr;
@@ -64,6 +64,7 @@ int write_exactly(int fd, const char* buff, size_t size);
 int read_exactly(int fd, char* buff, size_t size);
 int safe_sem_wait(sem_t* sem);
 void cleanup_processes(pid_t env_pid, pid_t pol_pid);
+pid_t result_printer();
 
 void handle_sigint(int) {
     if (global) {
@@ -101,12 +102,12 @@ int main(int argc, char *argv[]){
     // Reading tests from stdin
     char test_name[NAME_SIZE + 2];
 
-    while (true) {
-        int status;
+    pid_t printer_pid = result_printer();
 
-        while (waitpid(-1, &status, WNOHANG) > 0) {
-            // TODO o co chodzi
-        }
+    while (true) {
+
+        // Killing zombie childs
+        while (waitpid(-1, nullptr, WNOHANG) > 0) {}
 
         // Using fgets, for easier ctr+c handling
         if (fgets(test_name, sizeof(test_name), stdin) == NULL) {
@@ -138,6 +139,8 @@ int main(int argc, char *argv[]){
             exit(0);
         }
     }
+
+    close(fd_to_writer);
     while (waitpid(-1, nullptr, WNOHANG) > 0) {
         // TODO o co chodzi
     }
@@ -145,6 +148,8 @@ int main(int argc, char *argv[]){
     if (global) {
         was_interrupted = atomic_load(&global->shutdown);
     }
+
+    waitpid(printer_pid, NULL, 0);
 
     if (was_interrupted) {
         return 2;
@@ -160,7 +165,7 @@ void safe_close_pipes(int fd1, int fd2, int fd3, int fd4) {
     if (fd4 != -1) close(fd4);
 }
 
-int worker(int ticket, const char* test_name) {
+int worker(int test_num, const char* test_name) {
 
     int env_in = -1, env_out = -1;
     pid_t env_pid = 0;
@@ -190,6 +195,7 @@ int worker(int ticket, const char* test_name) {
 
     // Reading starting state from environment.
     if (read_exactly(env_out, state_buffer, STATE_SIZE + 1) != 0) {
+        sem_post(&global->sem_cpu);
         safe_close_pipes(env_in, env_out, pol_in, pol_out);
         cleanup_processes(env_pid, pol_pid);
         return 1;
@@ -258,8 +264,18 @@ int worker(int ticket, const char* test_name) {
     }
 
     state_buffer[STATE_SIZE + 1] = '\0';
-    printf("%s %s",test_name, state_buffer);
-    fflush(stdout);
+
+    struct Result result;
+
+    strncpy(result.test_name, test_name, NAME_SIZE);
+    result.test_name[NAME_SIZE] = '\0';
+
+    strncpy(result.test_result, state_buffer, STATE_SIZE);
+    result.test_result[STATE_SIZE] = '\0';
+
+    result.test_num = test_num;
+
+    write_exactly(fd_to_writer, (char*)&result, sizeof(struct Result));
 
     safe_close_pipes(env_in, env_out, pol_in, pol_out);
     cleanup_processes(env_pid, pol_pid);
@@ -268,8 +284,9 @@ int worker(int ticket, const char* test_name) {
 }
 
 
-int result_printer(int *result_out) {
+pid_t result_printer() {
 
+    int next_to_print = 0;
     std::map<int, Result> result_map;
 
     int fd[2];
@@ -280,21 +297,33 @@ int result_printer(int *result_out) {
 
     ASSERT_SYS_OK(pid);
 
+    // Child
     if (pid == 0) {
 
         close(fd[1]); // Closing writing end
-re
+
         while (true) {
             struct Result result;
             ssize_t r = read(fd[0], &result, sizeof(Result));
-            if (r <= 0) break; // better error handling
+            if (r <= 0) break; // TODO better error handling
 
-            result_map[result.test_num] =
+            result_map[result.test_num] = result;
 
+            while (result_map.count(next_to_print)) {
+                Result to_print = result_map[next_to_print];
+
+                printf("%s %s\n",to_print.test_name, to_print.test_result);
+                fflush(stdout);
+                result_map.erase(next_to_print);
+                next_to_print++;
+            }
         }
-
-
+        exit(0);
     }
+    // Parent
+    close(fd[0]);
+    fd_to_writer = fd[1];
+    return pid;
 }
 
 // Starting subprocess with initialized pipes,
