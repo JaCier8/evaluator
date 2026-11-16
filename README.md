@@ -199,4 +199,17 @@ The code is plain procedural C++ with no classes: global configuration plus free
 | `next_policy_id` | `atomic_int` | unique ids handed to policies across workers |
 | `shutdown` | `atomic_bool` | set by the SIGINT handler and read everywhere |
 | `next_ticket` | `atomic_int` | **unused** (ordering uses the local counter in `main`) |
-.
+
+## Tests
+
+```bash
+python3 tests/run_tests.py                 # uses build/solution/evaluator
+python3 tests/run_tests.py path/to/evaluator
+```
+
+These black-box tests drive the evaluator with the configurable fixtures in `tests/fixtures/` (`env.py`, `policy.py`, configured through environment variables such as `ENV_STEP_MS`, `ENV_CRASH_AT` and `ENV_IGNORE_INT`; see the docstring at the top of `env.py`).
+Each run happens in its own process group, so a Ctrl+C can be simulated, and a timeout turns a hang into a `FAIL … hang` instead of blocking forever. The fixtures assume the default sizes of 4.
+
+## Known issues / roadmap
+
+See [`TODO.md`](TODO.md).

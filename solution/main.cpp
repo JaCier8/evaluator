@@ -47,6 +47,7 @@ struct Global {
 
 struct Result {
     int test_num;
+    bool failed;      // episode broke (env/policy died, pipe error, SIGINT)
     char test_name[NAME_SIZE + 1];
     char test_result[STATE_SIZE + 1];
 };
@@ -55,7 +56,7 @@ struct Global* global = nullptr;
 
 void shm_init();
 void shm_cleanup();
-int worker(int my_ticket, const char* test_name);
+int worker(int my_ticket, const char* test_name, Result* result);
 pid_t start_subprocess(const char* path, char* const argv[],
     int* fd_write_to_child, int* fd_read_from_child);
 std::vector<char*> extra_args_to_argv (const char* exec_path,
@@ -135,7 +136,17 @@ int main(int argc, char *argv[]){
         ASSERT_SYS_OK(pid);
 
         if (pid == 0) {
-            worker(my_ticket, test_name);
+            // Like the sem_env slot, the Result is sent at this one level, so
+            // every test produces exactly one record, even a failed one.
+            // Otherwise the printer would wait for this test_num forever.
+            struct Result result {};
+            result.test_num = my_ticket;
+            memcpy(result.test_name, test_name, NAME_SIZE); // {} zeroed the terminator
+            result.failed = worker(my_ticket, test_name, &result) != 0;
+            write_exactly(fd_to_writer, (char*)&result, sizeof(struct Result));
+            // The slot was taken here in main, so it is returned here too:
+            // every worker passes this line, however it ended.
+            sem_post(&global->sem_env);
             exit(0);
         }
     }
@@ -165,7 +176,7 @@ void safe_close_pipes(int fd1, int fd2, int fd3, int fd4) {
     if (fd4 != -1) close(fd4);
 }
 
-int worker(int test_num, const char* test_name) {
+int worker(int test_num, const char* test_name, Result* result) {
 
     int env_in = -1, env_out = -1;
     pid_t env_pid = 0;
@@ -188,7 +199,6 @@ int worker(int test_num, const char* test_name) {
 
     // Starting env
     if (safe_sem_wait(&global->sem_cpu) != 0) {
-        sem_post(&global->sem_env);
         return 1;
     }
     env_pid = start_subprocess(env_path, env_argv.data(), &env_in, &env_out);
@@ -241,11 +251,19 @@ int worker(int test_num, const char* test_name) {
             return 1;
         }
 
-        // Policy ended
+        // Policy ended. Default (variant A): release the policy slot right
+        // away, so another worker can use it while we run the env step.
+        // Benchmark variant B (POL_RELEASE_LATE): keep it until the end of
+        // the iteration, to measure what the early release buys us.
+#ifndef POL_RELEASE_LATE
         sem_post(&global->sem_pol);
+#endif
 
         // Telling environment action to do
         if (write_exactly(env_in, action_buffer, ACTION_SIZE + 1) != 0) {
+#ifdef POL_RELEASE_LATE
+            sem_post(&global->sem_pol);
+#endif
             sem_post(&global->sem_cpu);
             safe_close_pipes(env_in, env_out, pol_in, pol_out);
             cleanup_processes(env_pid, pol_pid);
@@ -254,32 +272,28 @@ int worker(int test_num, const char* test_name) {
 
         // Getting a new state from environment
         if (read_exactly(env_out, state_buffer, STATE_SIZE + 1) != 0) {
+#ifdef POL_RELEASE_LATE
+            sem_post(&global->sem_pol);
+#endif
             sem_post(&global->sem_cpu);
             safe_close_pipes(env_in, env_out, pol_in, pol_out);
             cleanup_processes(env_pid, pol_pid);
             return 1;
         }
 
+#ifdef POL_RELEASE_LATE
+        sem_post(&global->sem_pol);
+#endif
         sem_post(&global->sem_cpu);
     }
 
     state_buffer[STATE_SIZE + 1] = '\0';
 
-    struct Result result;
-
-    strncpy(result.test_name, test_name, NAME_SIZE);
-    result.test_name[NAME_SIZE] = '\0';
-
-    strncpy(result.test_result, state_buffer, STATE_SIZE);
-    result.test_result[STATE_SIZE] = '\0';
-
-    result.test_num = test_num;
-
-    write_exactly(fd_to_writer, (char*)&result, sizeof(struct Result));
+    strncpy(result->test_result, state_buffer, STATE_SIZE);
+    result->test_result[STATE_SIZE] = '\0';
 
     safe_close_pipes(env_in, env_out, pol_in, pol_out);
     cleanup_processes(env_pid, pol_pid);
-    sem_post(&global->sem_env);
     return 0;
 }
 
@@ -312,7 +326,13 @@ pid_t result_printer() {
             while (result_map.count(next_to_print)) {
                 Result to_print = result_map[next_to_print];
 
-                printf("%s %s\n",to_print.test_name, to_print.test_result);
+                if (to_print.failed) {
+                    // Keep stdout in the normal format; report on stderr.
+                    fprintf(stderr, "test %s failed (env or policy error)\n",
+                            to_print.test_name);
+                } else {
+                    printf("%s %s\n", to_print.test_name, to_print.test_result);
+                }
                 fflush(stdout);
                 result_map.erase(next_to_print);
                 next_to_print++;

@@ -1,0 +1,4 @@
+Linux-7.0.0-43-generic-x86_64-with-glibc2.39
+cores (os.cpu_count): 16
+python 3.12.3
+workload: {'steps': 5, 'pol_step_ms': 10, 'env_step_ms': 40, 'env_init_ms': 0, 'pol_init_ms': 0}, tests=128

@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/evaluator.dir/main.cpp.o -o evaluator  ../common/liberr.a -lpthread -lrt 

@@ -1,0 +1,1 @@
+/usr/bin/cc CMakeFiles/demo_policy.dir/policy.c.o -o demo_policy  ../common/liberr.a 

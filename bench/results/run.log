@@ -1,0 +1,35 @@
+  cpu   early pol=16  cpu=1   envs=32  last=   3.91 tests/s  model=4.0
+  cpu   early pol=16  cpu=2   envs=32  last=   7.86 tests/s  model=8.0
+  cpu   early pol=16  cpu=4   envs=32  last=  15.61 tests/s  model=16.0
+  cpu   early pol=16  cpu=8   envs=32  last=  30.44 tests/s  model=32.0
+  cpu   early pol=16  cpu=16  envs=32  last=  57.99 tests/s  model=64.0
+wrote /home/claude/jacier8/evaluator/bench/results/cpu.csv
+  pol   early pol=1   cpu=32  envs=32  last=  19.26 tests/s  model=20.0
+  pol   early pol=2   cpu=32  envs=32  last=  38.21 tests/s  model=40.0
+  pol   early pol=4   cpu=32  envs=32  last=  73.43 tests/s  model=80.0
+  pol   early pol=8   cpu=32  envs=32  last= 110.58 tests/s  model=128.0
+  pol   early pol=16  cpu=32  envs=32  last= 108.94 tests/s  model=128.0
+wrote /home/claude/jacier8/evaluator/bench/results/pol.csv
+  envs  early pol=64  cpu=64  envs=1   last=   3.90 tests/s  model=4.0
+  envs  early pol=64  cpu=64  envs=2   last=   7.81 tests/s  model=8.0
+  envs  early pol=64  cpu=64  envs=4   last=  15.60 tests/s  model=16.0
+  envs  early pol=64  cpu=64  envs=8   last=  30.93 tests/s  model=32.0
+  envs  early pol=64  cpu=64  envs=16  last=  60.70 tests/s  model=64.0
+  envs  early pol=64  cpu=64  envs=32  last= 111.06 tests/s  model=128.0
+wrote /home/claude/jacier8/evaluator/bench/results/envs.csv
+  ab    early pol=1   cpu=16  envs=32  last=  19.37 tests/s  model=20.0
+  ab    early pol=2   cpu=16  envs=32  last=  38.19 tests/s  model=40.0
+  ab    early pol=4   cpu=16  envs=32  last=  59.92 tests/s  model=64.0
+  ab    early pol=8   cpu=16  envs=32  last=  60.29 tests/s  model=64.0
+  ab    early pol=16  cpu=16  envs=32  last=  59.18 tests/s  model=64.0
+  ab    late  pol=1   cpu=16  envs=32  last=   3.96 tests/s  model=4.0
+  ab    late  pol=2   cpu=16  envs=32  last=   7.88 tests/s  model=8.0
+  ab    late  pol=4   cpu=16  envs=32  last=  15.58 tests/s  model=16.0
+  ab    late  pol=8   cpu=16  envs=32  last=  30.40 tests/s  model=32.0
+  ab    late  pol=16  cpu=16  envs=32  last=  58.50 tests/s  model=64.0
+wrote /home/claude/jacier8/evaluator/bench/results/ab.csv
+  busy  early pol=16  cpu=1   envs=16  last=   3.93 tests/s  model=
+  busy  early pol=16  cpu=2   envs=16  last=   7.43 tests/s  model=
+  busy  early pol=16  cpu=4   envs=16  last=   7.81 tests/s  model=
+  busy  early pol=16  cpu=8   envs=16  last=   7.82 tests/s  model=
+wrote /home/claude/jacier8/evaluator/bench/results/busy.csv

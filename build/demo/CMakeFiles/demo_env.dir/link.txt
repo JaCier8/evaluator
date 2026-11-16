@@ -1,0 +1,1 @@
+/usr/bin/cc CMakeFiles/demo_env.dir/env.c.o -o demo_env  ../common/liberr.a 
